@@ -71,28 +71,24 @@ bool tcp_client::conn(string address , uint16_t port){
       return false;
     }
 
-    {
+    { //Print Infos for resolved hostname
       cout << "Hostname: " << he->h_name << "\n";
       if(AF_INET == he->h_addrtype)  cout << "IPv4" << " --> sizeof(" << he->h_length << ")" << "\n";
       if(AF_INET6 == he->h_addrtype) cout << "IPv6" << " --> sizeof(" << he->h_length << ")" << "\n";
       size_t ii = 0;
       for(char* adr = he->h_addr_list[ii]; adr!=nullptr; adr=he->h_addr_list[ii++]){
-        /*cout << "IP: ";
-        for(size_t ij=0; ij<static_cast<size_t>(he->h_length); ++ij){
-          cout << uint16_t(uint8_t(adr[ij]));
-          if(ii<(static_cast<size_t>(he->h_length)-1))cout << ".";
-        }
-        cout << "\n";*/
         cout << "IP: " << inet_ntoa(*reinterpret_cast<struct in_addr*>(adr)) << "\n";
       }
     }
 
-    if(AF_INET == he->h_addrtype){
-      //Cast the h_addr_list to in_addr , since h_addr_list also has the ip address in long format only
-      addr_list = reinterpret_cast<struct in_addr **>(he->h_addr_list);
-      server.sin_addr = *addr_list[0];
-    }else{
-      cout << "IPv6 not implemented yet" << "\n";
+    { //set Internet Adress
+      if(AF_INET == he->h_addrtype){
+        //Cast the h_addr_list to in_addr , since h_addr_list also has the ip address in long format only
+        addr_list = reinterpret_cast<struct in_addr **>(he->h_addr_list);
+        server.sin_addr = *addr_list[0];
+      }else{
+        cout << "IPv6 not implemented yet" << "\n";
+      }
     }
   }else{ //plain ip address
     server.sin_addr.s_addr = ipadr.s_addr;
@@ -117,7 +113,7 @@ bool tcp_client::conn(string address , uint16_t port){
 bool tcp_client::send_data(string data){
   bool res = true;
   //Send some data
-  if( send(sock , data.c_str() , strlen( data.c_str() ) , 0) < 0){
+  if( send(sock , data.c_str() , data.size() , 0) < 0){
     perror("Send failed : ");
     res = false;
   }else{
