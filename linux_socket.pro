@@ -5,7 +5,9 @@ CONFIG -= qt
 
 SOURCES += \
         main.cpp \
-    tcp_client.cpp
+    tcp_client.cpp \
+    mqtt_client.cpp
 
 HEADERS += \
-    tcp_client.h
+    tcp_client.h \
+    mqtt_client.h
