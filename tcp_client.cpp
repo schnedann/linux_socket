@@ -5,6 +5,7 @@
 #include <cerrno>
 #include <cstring>
 
+#include <time.h>
 #include <sys/socket.h>
 #include <netdb.h>
 
@@ -87,7 +88,7 @@ bool tcp_client::conn(string address , uint16_t port){
 /**
  * Send data to the connected host
  */
-bool tcp_client::send_data(string data){
+bool tcp_client::send_data(string data) const{
   bool res = true;
   //Send some data
   if( send(sock , data.c_str() , data.size() , 0) < 0){
@@ -107,11 +108,30 @@ string tcp_client::receive(int const size=512){
   string reply;
 
   //Receive a reply from the server
-  if( recv(sock , buffer , sizeof(buffer) , 0) < 0){
-    cout << "recv failed" << "\n";
+  uint16_t timeout = 3000; // 3000*10ms = 30s
+  ssize_t res = -1;
+  while (timeout>0) {
+    res = recv(sock , buffer , sizeof(buffer) , MSG_DONTWAIT);
+    if(res > 0) break;
+    if(res == -1){
+      if(errno==EAGAIN) goto iter;
+      if(errno==EWOULDBLOCK) goto iter;
+      break;
+    }
+iter:
+    struct timespec const ts = {0,10000000};
+    nanosleep(&ts, nullptr);
+    --timeout;
   }
 
-  reply = buffer;
+  //if( recv(sock , buffer , sizeof(buffer) , MSG_DONTWAIT) < 0){
+  if(res==-1){
+    cout << "recv failed" << "\n";
+  }else{
+    cout << "Bytes received: " << res << "\n";
+    reply = buffer;
+  }
+
   delete [] buffer;
   return reply;
 }
