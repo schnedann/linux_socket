@@ -42,50 +42,52 @@ bool tcp_client::connect_to(string address , uint16_t port){
     sock = socket(AF_INET , SOCK_STREAM , 0);
     if (sock == socket_void){
       err = true;
-      std::cout << "socket() failed: " << std::strerror(errno) << "\n";
-      perror("Could not create socket");
+      //std::cout << "socket() failed: " << std::strerror(errno) << "\n";
+      perror("tcp_client::connect_to - Could not create socket");
     }
     cout << "Socket created " << "\n";
   }
   else{ /* OK , nothing */ }
 
-  //setup address structure
-  struct in_addr ipadr;
-  if(0==inet_aton(address.c_str(),&ipadr)){ //domain string which needs to be resolved
-    struct hostent *he;
-    struct in_addr **addr_list;
+  if(!err){
+    //setup address structure
+    struct in_addr ipadr;
+    if(0==inet_aton(address.c_str(),&ipadr)){ //domain string which needs to be resolved
+      struct hostent *he;
+      struct in_addr **addr_list;
 
-    //resolve the hostname, its not an ip address
-    if ( (he = gethostbyname( address.c_str() ) ) == nullptr){
-      err = true;
-      //gethostbyname failed
-      herror("gethostbyname");
-      cout << "Failed to resolve hostname" << "\n";
-      return false;
-    }
-
-    { //Print Infos for resolved hostname
-      cout << "Hostname: " << he->h_name << "\n";
-      if(AF_INET == he->h_addrtype)  cout << "IPv4" << " --> sizeof(" << he->h_length << ")" << "\n";
-      if(AF_INET6 == he->h_addrtype) cout << "IPv6" << " --> sizeof(" << he->h_length << ")" << "\n";
-      size_t ii = 0;
-      for(char* adr = he->h_addr_list[ii]; adr!=nullptr; adr=he->h_addr_list[ii++]){
-        cout << "IP: " << inet_ntoa(*reinterpret_cast<struct in_addr*>(adr)) << "\n";
-      }
-    }
-
-    { //set Internet Adress
-      if(AF_INET == he->h_addrtype){
-        //Cast the h_addr_list to in_addr , since h_addr_list also has the ip address in long format only
-        addr_list = reinterpret_cast<struct in_addr **>(he->h_addr_list);
-        server.sin_addr = *addr_list[0];
-      }else{
+      //resolve the hostname, its not an ip address
+      if ( (he = gethostbyname( address.c_str() ) ) == nullptr){
         err = true;
-        cout << "IPv6 not implemented yet" << "\n";
+        //gethostbyname failed
+        herror("gethostbyname");
+        cout << "Failed to resolve hostname" << "\n";
+        return false;
       }
+
+      { //Print Infos for resolved hostname
+        cout << "Hostname: " << he->h_name << "\n";
+        if(AF_INET == he->h_addrtype)  cout << "IPv4" << " --> sizeof(" << he->h_length << ")" << "\n";
+        if(AF_INET6 == he->h_addrtype) cout << "IPv6" << " --> sizeof(" << he->h_length << ")" << "\n";
+        size_t ii = 0;
+        for(char* adr = he->h_addr_list[ii]; adr!=nullptr; adr=he->h_addr_list[ii++]){
+          cout << "IP: " << inet_ntoa(*reinterpret_cast<struct in_addr*>(adr)) << "\n";
+        }
+      }
+
+      { //set Internet Adress
+        if(AF_INET == he->h_addrtype){
+          //Cast the h_addr_list to in_addr , since h_addr_list also has the ip address in long format only
+          addr_list = reinterpret_cast<struct in_addr **>(he->h_addr_list);
+          server.sin_addr = *addr_list[0];
+        }else{
+          err = true;
+          cout << "IPv6 not implemented yet" << "\n";
+        }
+      }
+    }else{ //plain ip address
+      server.sin_addr.s_addr = ipadr.s_addr;
     }
-  }else{ //plain ip address
-    server.sin_addr.s_addr = ipadr.s_addr;
   }
 
   if(!err){
@@ -97,13 +99,20 @@ bool tcp_client::connect_to(string address , uint16_t port){
       close(sock);
       sock = socket_void;
       err = true;
-      perror("connect failed. Error");
+      perror("tcp_client::connect_to - connect failed. Error");
       return 1;
     }
 
     cout << "Connected" << "\n";
   }
 
+  return err;
+}
+
+bool tcp_client::listen_to(string address, uint16_t port)
+{
+  bool err = true;
+  listen(sock, 128);
   return err;
 }
 
@@ -123,9 +132,9 @@ bool tcp_client::send_data(string data) const{
     err = false;
     if(send(sock , data.c_str() , data.size() , 0) < 0){
       err = true;
-      perror("Send failed : ");
+      perror("tcp_client::connect_to - Send failed: ");
     }else{
-      cout<<"Data send\n";
+      cout << "Data send" << "\n";
     }
   }
   return err;

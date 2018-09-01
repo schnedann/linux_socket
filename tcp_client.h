@@ -20,6 +20,7 @@ public:
   tcp_client() noexcept;
   ~tcp_client() noexcept;
   bool connect_to(std::string address, uint16_t port);
+  bool listen_to(std::string address, uint16_t port);
   bool is_connected() const;
   bool send_data(std::string data) const;
   std::string receive(const int);
