@@ -20,7 +20,7 @@ int main(int argc __attribute__((unused)), char *argv[] __attribute__((unused)))
   c.conn(host , 80);
 
   //send some data
-  c.send_data("GET / HTTP/1.1\r\n\r\n");
+  c.send_data("GET /index.html HTTP/1.1\r\n\r\n");
 
   //receive and echo reply
   cout << "----------------------------\n\n";
