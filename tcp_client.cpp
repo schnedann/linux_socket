@@ -28,15 +28,20 @@ tcp_client::~tcp_client() noexcept{
 }
 
 /**
- * Connect to a host on a certain port number
+ * @brief tcp_client::connect_to - Connect to a host on a certain port number
+ * @param address - IP or domain string
+ * @param port    - IP Port
+ * @return true on error
  */
-bool tcp_client::conn(string address , uint16_t port){
+bool tcp_client::connect_to(string address , uint16_t port){
+  bool err = false;
 
   //create socket if it is not already created
   if(sock == socket_void){
     //Create socket
     sock = socket(AF_INET , SOCK_STREAM , 0);
-    if (sock == -1){
+    if (sock == socket_void){
+      err = true;
       std::cout << "socket() failed: " << std::strerror(errno) << "\n";
       perror("Could not create socket");
     }
@@ -52,6 +57,7 @@ bool tcp_client::conn(string address , uint16_t port){
 
     //resolve the hostname, its not an ip address
     if ( (he = gethostbyname( address.c_str() ) ) == nullptr){
+      err = true;
       //gethostbyname failed
       herror("gethostbyname");
       cout << "Failed to resolve hostname" << "\n";
@@ -74,6 +80,7 @@ bool tcp_client::conn(string address , uint16_t port){
         addr_list = reinterpret_cast<struct in_addr **>(he->h_addr_list);
         server.sin_addr = *addr_list[0];
       }else{
+        err = true;
         cout << "IPv6 not implemented yet" << "\n";
       }
     }
@@ -81,66 +88,85 @@ bool tcp_client::conn(string address , uint16_t port){
     server.sin_addr.s_addr = ipadr.s_addr;
   }
 
-  server.sin_family = AF_INET;
-  server.sin_port = htons( port );
+  if(!err){
+    server.sin_family = AF_INET;
+    server.sin_port = htons( port );
 
-  //Connect to remote server
-  if (connect(sock , reinterpret_cast<struct sockaddr *>(&server), sizeof(server)) < 0){
-    perror("connect failed. Error");
-    return 1;
+    //Connect to remote server
+    if (connect(sock , reinterpret_cast<struct sockaddr *>(&server), sizeof(server)) < 0){
+      close(sock);
+      sock = socket_void;
+      err = true;
+      perror("connect failed. Error");
+      return 1;
+    }
+
+    cout << "Connected" << "\n";
   }
 
-  cout << "Connected" << "\n";
-  return true;
+  return err;
+}
+
+bool tcp_client::is_connected() const{
+  return (sock!=socket_void);
 }
 
 /**
- * Send data to the connected host
+ * @brief tcp_client::send_data - Send data to the connected host
+ * @param data - data to send
+ * @return true on error
  */
 bool tcp_client::send_data(string data) const{
-  bool res = true;
+  bool err = true;
   //Send some data
-  if( send(sock , data.c_str() , data.size() , 0) < 0){
-    perror("Send failed : ");
-    res = false;
-  }else{
-    cout<<"Data send\n";
+  if(is_connected()){
+    err = false;
+    if(send(sock , data.c_str() , data.size() , 0) < 0){
+      err = true;
+      perror("Send failed : ");
+    }else{
+      cout<<"Data send\n";
+    }
   }
-  return res;
+  return err;
 }
 
 /**
- * Receive data from the connected host
+ * @brief tcp_client::receive - Receive data from the connected host
+ * @param size - buffer size for message
+ * @return
  */
 string tcp_client::receive(int const size=512){
-  char* buffer = new char[size+1];
   string reply;
+  if(is_connected()){
+    char* buffer = new char[size+1];
 
-  //Receive a reply from the server
-  uint16_t timeout = 2400; // 2400*25ms = 60s
-  ssize_t res = -1;
-  while (timeout>0) {
-    res = recv(sock , buffer , sizeof(buffer) , MSG_DONTWAIT);
-    if(res > 0) break;
-    if(res == -1){
-      if(errno==EAGAIN) goto iter;
-      if(errno==EWOULDBLOCK) goto iter;
-      break;
+    //Receive a reply from the server
+    uint16_t timeout = 2400; // 2400*25ms = 60s
+    ssize_t res = -1;
+    while (timeout>0) {
+      res = recv(sock , buffer , sizeof(buffer) , MSG_DONTWAIT);
+      if(res > 0) break;
+      if(res == -1){
+        if(errno==EAGAIN) goto iter;
+        if(errno==EWOULDBLOCK) goto iter;
+        break;
+      }
+  iter:
+      struct timespec const ts = {0,25000000};
+      nanosleep(&ts, nullptr);
+      --timeout;
     }
-iter:
-    struct timespec const ts = {0,25000000};
-    nanosleep(&ts, nullptr);
-    --timeout;
-  }
 
-  //if( recv(sock , buffer , sizeof(buffer) , MSG_DONTWAIT) < 0){
-  if(res==-1){
-    cout << "recv failed" << "\n";
-  }else{
-    cout << "Bytes received: " << res << "\n";
-    reply = buffer;
-  }
+    //if( recv(sock , buffer , sizeof(buffer) , MSG_DONTWAIT) < 0){
+    if(res==-1){
+      cout << "recv failed" << "\n";
+    }else{
+      cout << "Bytes received: " << res << "\n";
+      reply = buffer;
+    }
 
-  delete [] buffer;
+    delete [] buffer;
+  }
   return reply;
 }
