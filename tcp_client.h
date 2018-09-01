@@ -18,6 +18,7 @@ private:
 
 public:
   tcp_client() noexcept;
+  ~tcp_client() noexcept;
   bool conn(std::string, uint16_t);
   bool send_data(std::string data) const;
   std::string receive(const int);

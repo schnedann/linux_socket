@@ -8,6 +8,7 @@
 #include <time.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <unistd.h>
 
 using namespace std;
 
@@ -15,6 +16,14 @@ tcp_client::tcp_client() noexcept{
   sock = socket_void;
   port = 0;
   address = "";
+  return;
+}
+
+tcp_client::~tcp_client() noexcept{
+  if(socket_void!=sock){
+    close(sock);
+    sock = socket_void;
+  }
   return;
 }
 
@@ -108,7 +117,7 @@ string tcp_client::receive(int const size=512){
   string reply;
 
   //Receive a reply from the server
-  uint16_t timeout = 3000; // 3000*10ms = 30s
+  uint16_t timeout = 2400; // 2400*25ms = 60s
   ssize_t res = -1;
   while (timeout>0) {
     res = recv(sock , buffer , sizeof(buffer) , MSG_DONTWAIT);
@@ -119,7 +128,7 @@ string tcp_client::receive(int const size=512){
       break;
     }
 iter:
-    struct timespec const ts = {0,10000000};
+    struct timespec const ts = {0,25000000};
     nanosleep(&ts, nullptr);
     --timeout;
   }
