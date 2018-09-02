@@ -42,7 +42,6 @@ bool tcp_client::connect_to(string address , uint16_t port){
     sock = socket(AF_INET , SOCK_STREAM , 0);
     if (sock == socket_void){
       err = true;
-      //std::cout << "socket() failed: " << std::strerror(errno) << "\n";
       perror("tcp_client::connect_to - Could not create socket");
     }
     cout << "Socket created " << "\n";

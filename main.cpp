@@ -1,31 +1,19 @@
 /**
  * C++ client example using sockets
+ * Simple MQTT client
  */
 
 #include <iostream>
 #include <cstdint>
 
-#include "tcp_client.h"
+#include "mqtt_client.h"
 
 using namespace std;
 
 int main(int argc __attribute__((unused)), char *argv[] __attribute__((unused))){
-  tcp_client c;
-  string host;
+  mqtt_client mqttc;
 
-  cout<<"Enter hostname : ";
-  cin>>host;
-
-  //connect to host
-  c.connect_to(host , 80);
-
-  //send some data
-  c.send_data("GET /index.html HTTP/1.1\r\n\r\n");
-
-  //receive and echo reply
-  cout << "----------------------------\n\n";
-  cout << c.receive(1024) << "\n\n";
-  cout << "----------------------------\n\n";
+  mqttc.connect_to("",0);
 
   //done
   return 0;
