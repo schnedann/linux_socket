@@ -47,19 +47,20 @@ mqtt_client::mqtt_client()
  */
 bool mqtt_client::connect_to(std::string broker, uint16_t port)
 {
-  bool err = tcp_client::connect_to(broker,port);
+  Network::tcp_client::prepare_con(ncon,broker,port);
+  bool err = Network::tcp_client::connect_to(ncon);
   if(!err){
     string data;
-    tcp_client::send_data(data);
-    string answer = tcp_client::receive(1024);
+    Network::tcp_client::send_data(ncon,data);
+    string answer = Network::tcp_client::receive(ncon,1024);
   }
   return err;
 }
 
 bool mqtt_client::publish(string data)
 {
-  tcp_client::send_data(data);
-  string answer = tcp_client::receive(1024);
+  Network::tcp_client::send_data(ncon,data);
+  string answer = Network::tcp_client::receive(ncon,1024);
   return false;
 }
 

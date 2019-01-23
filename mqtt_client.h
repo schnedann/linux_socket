@@ -26,9 +26,11 @@ enum class mqtt_Control_Packet_type: uint8_t{
 
 };
 
-class mqtt_client : private tcp_client
+class mqtt_client
 {
 private:
+  Network::connection ncon;
+
   std::vector<uint8_t> get_mqtt_header(mqtt_Control_Packet_type cpt, uint8_t pubflags, uint32_t psize);
   std::vector<uint8_t> encode_length(uint32_t psize);
 public:

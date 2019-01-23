@@ -4,59 +4,83 @@
 #include <cstdint>
 #include <cerrno>
 #include <cstring>
+#include <algorithm>
 
 #include <time.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <unistd.h>
 
+#include "debug_print.h"
+
 using namespace std;
 
-tcp_client::tcp_client() noexcept{
-  sock = socket_void;
-  port = 0;
-  address = "";
-  return;
+/**
+ * @brief Network::connection::connection
+ */
+Network::connection::connection():address(),sock(0),port(0)
+{
+  //Zero mngt struct
+  u8* bptr = reinterpret_cast<u8*>(&server);
+  u8* eptr = &bptr[sizeof(inet_sock_t)];
+  std::fill(bptr,eptr,0);
 }
 
-tcp_client::~tcp_client() noexcept{
-  if(socket_void!=sock){
+/**
+ * @brief Network::connection::~connection
+ */
+Network::connection::~connection()
+{
+  if(reterr!=sock){
     close(sock);
-    sock = socket_void;
+    sock = reterr;
   }
   return;
 }
 
+//-----
+
 /**
- * @brief tcp_client::connect_to - Connect to a host on a certain port number
+ * @brief Network::tcp_client::connect_to - Connect to a host on a certain port number
  * @param address - IP or domain string
  * @param port    - IP Port
  * @return true on error
  */
-bool tcp_client::connect_to(string address , uint16_t port){
+void Network::tcp_client::prepare_con(Network::connection &con, string a, in_port_t p)
+{
+  //Zero mngt struct
+  u8* bptr = reinterpret_cast<u8*>(&con.server);
+  u8* eptr = &bptr[sizeof(inet_sock_t)];
+  std::fill(bptr,eptr,0);
+
+  con.sock = reterr;
+  con.address = a;
+  con.port = p;
+  return;
+}
+
+bool Network::tcp_client::connect_to(connection& con){
   bool err = false;
 
   //create socket if it is not already created
-  if(sock == socket_void){
-    //Create socket
-    sock = socket(AF_INET , SOCK_STREAM , 0);
-    if (sock == socket_void){
+  if(con.sock == reterr){
+    //Create nonblocking socket
+    con.sock = socket(AF_INET , SOCK_NONBLOCK | SOCK_STREAM , 0);
+    if (con.sock == reterr){
       err = true;
-      perror("tcp_client::connect_to - Could not create socket");
+      perror("Network::tcp_client::connect_to - Could not create socket");
     }
-    cout << "Socket created " << "\n";
+    DBGOUT("Socket created")
   }
-  else{ /* OK , nothing */ }
-
   if(!err){
     //setup address structure
     struct in_addr ipadr;
-    if(0==inet_aton(address.c_str(),&ipadr)){ //domain string which needs to be resolved
+    if(0==inet_aton(con.address.c_str(),&ipadr)){ //domain string which needs to be resolved
       struct hostent *he;
       struct in_addr **addr_list;
 
       //resolve the hostname, its not an ip address
-      if ( (he = gethostbyname( address.c_str() ) ) == nullptr){
+      if ( (he = gethostbyname( con.address.c_str() ) ) == nullptr){
         err = true;
         //gethostbyname failed
         herror("gethostbyname");
@@ -78,27 +102,27 @@ bool tcp_client::connect_to(string address , uint16_t port){
         if(AF_INET == he->h_addrtype){
           //Cast the h_addr_list to in_addr , since h_addr_list also has the ip address in long format only
           addr_list = reinterpret_cast<struct in_addr **>(he->h_addr_list);
-          server.sin_addr = *addr_list[0];
+          con.server.sin_addr = *addr_list[0];
         }else{
           err = true;
           cout << "IPv6 not implemented yet" << "\n";
         }
       }
     }else{ //plain ip address
-      server.sin_addr.s_addr = ipadr.s_addr;
+      con.server.sin_addr.s_addr = ipadr.s_addr;
     }
   }
 
   if(!err){
-    server.sin_family = AF_INET;
-    server.sin_port = htons( port );
+    con.server.sin_family = AF_INET;
+    con.server.sin_port = htons( con.port );
 
     //Connect to remote server
-    if (connect(sock , reinterpret_cast<struct sockaddr *>(&server), sizeof(server)) < 0){
-      close(sock);
-      sock = socket_void;
+    if (connect(con.sock , reinterpret_cast<struct sockaddr *>(&con.server), sizeof(inet_sock_t)) < 0){
+      close(con.sock);
+      con.sock = reterr;
       err = true;
-      perror("tcp_client::connect_to - connect failed. Error");
+      perror("Network::tcp_client::connect_to - connect failed. Error");
       return 1;
     }
 
@@ -108,30 +132,30 @@ bool tcp_client::connect_to(string address , uint16_t port){
   return err;
 }
 
-bool tcp_client::listen_to(string address, uint16_t port)
+bool Network::tcp_client::listen_to(connection& con)
 {
   bool err = true;
-  listen(sock, 128);
+  listen(con.sock, 128);
   return err;
 }
 
-bool tcp_client::is_connected() const{
-  return (sock!=socket_void);
+bool Network::tcp_client::is_connected(connection& con){
+  return (con.sock!=reterr);
 }
 
 /**
- * @brief tcp_client::send_data - Send data to the connected host
+ * @brief Network::tcp_client::send_data - Send data to the connected host
  * @param data - data to send
  * @return true on error
  */
-bool tcp_client::send_data(string data) const{
+bool Network::tcp_client::send_data(connection& con, string data){
   bool err = true;
   //Send some data
-  if(is_connected()){
+  if(is_connected(con)){
     err = false;
-    if(send(sock , data.c_str() , data.size() , 0) < 0){
+    if(send(con.sock , data.c_str() , data.size() , 0) < 0){
       err = true;
-      perror("tcp_client::connect_to - Send failed: ");
+      perror("Network::tcp_client::connect_to - Send failed: ");
     }else{
       cout << "Data send" << "\n";
     }
@@ -140,22 +164,22 @@ bool tcp_client::send_data(string data) const{
 }
 
 /**
- * @brief tcp_client::receive - Receive data from the connected host
+ * @brief Network::tcp_client::receive - Receive data from the connected host
  * @param size - buffer size for message
  * @return
  */
-string tcp_client::receive(int const size=512){
+string Network::tcp_client::receive(connection& con, int const size=512){
   string reply;
-  if(is_connected()){
+  if(is_connected(con)){
     char* buffer = new char[size+1];
 
     //Receive a reply from the server
     uint16_t timeout = 2400; // 2400*25ms = 60s
-    ssize_t res = -1;
+    ssize_t res = reterr;
     while (timeout>0) {
-      res = recv(sock , buffer , sizeof(buffer) , MSG_DONTWAIT);
+      res = recv(con.sock , buffer , sizeof(buffer) , MSG_DONTWAIT);
       if(res > 0) break;
-      if(res == -1){
+      if(res == reterr){
         if(errno==EAGAIN) goto iter;
         if(errno==EWOULDBLOCK) goto iter;
         break;
@@ -167,7 +191,7 @@ string tcp_client::receive(int const size=512){
     }
 
     //if( recv(sock , buffer , sizeof(buffer) , MSG_DONTWAIT) < 0){
-    if(res==-1){
+    if(res==reterr){
       cout << "recv failed" << "\n";
     }else{
       cout << "Bytes received: " << res << "\n";
