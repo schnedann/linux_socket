@@ -10,6 +10,7 @@
 namespace Network {
 
   using inet_sock_t = struct sockaddr_in;
+  using inet6_sock_t = struct sockaddr_in6;
   using unix_sock_t = struct sockaddr_un;
 
   enum class domain:sa_family_t{
@@ -51,7 +52,7 @@ namespace Network {
     static bool listen_to(connection& con);
     static bool is_connected(connection& con);
     static bool send_data(connection& con, std::string data);
-    static std::string receive(connection& con, const int size);
+    static std::string receive(connection& con, const u32 size);
   };
 }
 

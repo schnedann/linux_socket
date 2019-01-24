@@ -16,6 +16,19 @@
 using namespace std;
 
 /**
+ * @brief emerg_exit - This function is called when a system call fails.
+ * It displays a message about the error on stderr and then aborts the program.
+ * @param trigger
+ */
+void emerg_exit(bool trigger, std::string msg){
+  if(trigger){
+    perror(msg.c_str());
+    exit(1);
+  }
+  return;
+}
+
+/**
  * @brief Network::connection::connection
  */
 Network::connection::connection():address(),sock(0),port(0)
@@ -66,13 +79,12 @@ bool Network::tcp_client::connect_to(connection& con){
   if(con.sock == reterr){
     //Create nonblocking socket
     con.sock = socket(AF_INET , SOCK_NONBLOCK | SOCK_STREAM , 0);
-    if (con.sock == reterr){
-      err = true;
-      perror("Network::tcp_client::connect_to - Could not create socket");
-    }
-    DBGOUT("Socket created")
+    err = (con.sock == reterr);
   }
+  emerg_exit(err,"Network::tcp_client::connect_to - Could not create socket");
   if(!err){
+    DBGOUT("Socket created")
+
     //setup address structure
     struct in_addr ipadr;
     if(0==inet_aton(con.address.c_str(),&ipadr)){ //domain string which needs to be resolved
@@ -122,10 +134,8 @@ bool Network::tcp_client::connect_to(connection& con){
       close(con.sock);
       con.sock = reterr;
       err = true;
-      perror("Network::tcp_client::connect_to - connect failed. Error");
-      return 1;
     }
-
+    emerg_exit(err,"Network::tcp_client::connect_to - connect failed. Error");
     cout << "Connected" << "\n";
   }
 
@@ -155,11 +165,11 @@ bool Network::tcp_client::send_data(connection& con, string data){
     err = false;
     if(send(con.sock , data.c_str() , data.size() , 0) < 0){
       err = true;
-      perror("Network::tcp_client::connect_to - Send failed: ");
     }else{
       cout << "Data send" << "\n";
     }
   }
+  emerg_exit(err,"Network::tcp_client::connect_to - Send failed: ");
   return err;
 }
 
@@ -168,7 +178,7 @@ bool Network::tcp_client::send_data(connection& con, string data){
  * @param size - buffer size for message
  * @return
  */
-string Network::tcp_client::receive(connection& con, int const size=512){
+string Network::tcp_client::receive(connection& con, u32 const size=512){
   string reply;
   if(is_connected(con)){
     char* buffer = new char[size+1];
